@@ -44,7 +44,7 @@ class HSAlgo {
 
   // round end
   mutable std::mutex mutex_round_end_counter_;
-  std::ptrdiff_t round_end_counter_;
+  std::size_t round_end_counter_;
   std::condition_variable round_end_;
 
   // threads

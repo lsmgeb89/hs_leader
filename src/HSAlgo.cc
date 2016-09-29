@@ -16,7 +16,7 @@ void HSAlgo::Process(const std::size_t& id,
                      utils::MessageChannel& recv_from_succ_ch) {
   std::size_t round_to_exit(2);
   std::size_t succ_to_exit(2);
-  std::size_t round(0);
+  std::ptrdiff_t round(0);
   bool pred_exit(false);
 
   // states

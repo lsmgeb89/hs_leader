@@ -12,16 +12,23 @@ enum Flag {
   Out = 2
 };
 
+enum MessageType {
+  NullType = 0,
+  SelectLeader = 1,
+  NotifyLeader = 2
+};
+
 struct Message {
-  bool is_null_;
+  MessageType type_;
   std::size_t uid_;
   Flag flag_;
   std::size_t hop_count_;
+
   std::string ToString(void) {
     std::stringstream out;
-    if (is_null_) {
+    if (NullType == type_) {
       out << "null message";
-    } else {
+    } else if (SelectLeader == type_) {
       out << "uid = " << uid_;
       if (flag_ == In) {
         out << " in-bound";
@@ -29,6 +36,8 @@ struct Message {
         out << " out-bound";
       }
       out << " hop = " << hop_count_;
+    } else {
+      out << "notify leader: " << uid_;
     }
     return out.str();
   }

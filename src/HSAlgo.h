@@ -48,7 +48,7 @@ class HSAlgo {
   std::condition_variable round_end_;
 
   // threads
-  const std::size_t process_num_;
+  std::size_t process_num_;
   const std::vector<std::size_t> process_ids_;
   std::thread master_thread_;
   std::vector<std::thread> process_threads_;

@@ -1,0 +1,9 @@
+[process 9] round 38 I'm the leader.
+[process 4] round 39 I know process 9 is the leader.
+[process 6] round 40 I know process 9 is the leader.
+[process 7] round 41 I know process 9 is the leader.
+[process 3] round 42 I know process 9 is the leader.
+[process 5] round 43 I know process 9 is the leader.
+[process 2] round 44 I know process 9 is the leader.
+[process 1] round 45 I know process 9 is the leader.
+[process 8] round 46 I know process 9 is the leader.

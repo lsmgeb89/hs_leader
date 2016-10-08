@@ -10,6 +10,7 @@ void HSAlgo::Run(void) {
 }
 
 void HSAlgo::Process(const std::size_t& id,
+                     ThreadState* state,
                      utils::MessageChannel& send_to_pred_ch,
                      utils::MessageChannel& recv_from_pred_ch,
                      utils::MessageChannel& send_to_succ_ch,
@@ -29,8 +30,8 @@ void HSAlgo::Process(const std::size_t& id,
   while (round_to_exit) {
     // round begin
     {
-      std::unique_lock<std::mutex> lock(mutex_round_);
-      round_begin_.wait(lock, [this, round] { return (round == round_); });
+      std::unique_lock<std::mutex> lock(mutex_round_begin_);
+      round_begin_.wait(lock, [state] { return (*state == RoundBegin); });
       std::cout << lock_with(mutex_log_)
                 << "[" << id << "] round " << round << " begins" << std::endl;
     }
@@ -222,11 +223,11 @@ void HSAlgo::Process(const std::size_t& id,
 
     // round end
     {
-      std::unique_lock<std::mutex> lock(mutex_round_end_counter_);
+      std::unique_lock<std::mutex> lock(mutex_round_end_);
       if (!round_to_exit) {
-        process_num_--;
+        *state = Exited;
       } else {
-        round_end_counter_++;
+        *state = RoundEnd;
       }
       round_end_.notify_one();
       std::cout << lock_with(mutex_log_)
@@ -239,27 +240,35 @@ void HSAlgo::Process(const std::size_t& id,
 
 void HSAlgo::Master(void) {
   // spawn threads
-  for (size_t i = 0; i < process_num_; i++) {
+  for (size_t i = 0; i < thread_num_; i++) {
     process_threads_.emplace_back([this, i] { this->Process(process_ids_.at(i),
-                                                            recv_channels_.at((i + process_num_ - 1) % process_num_),
-                                                            send_channels_.at((i + process_num_ - 1) % process_num_),
+                                                            &thread_states_.at(i),
+                                                            recv_channels_.at((i + thread_num_ - 1) % thread_num_),
+                                                            send_channels_.at((i + thread_num_ - 1) % thread_num_),
                                                             send_channels_.at(i),
                                                             recv_channels_.at(i)); });
   }
 
-  while (process_num_) {
+
+  while (std::any_of(thread_states_.cbegin(),
+                     thread_states_.cend(),
+                     [](const ThreadState& state) { return (state == RoundEnd);})) {
     {
-      std::unique_lock<std::mutex> lock(mutex_round_);
+      std::unique_lock<std::mutex> lock(mutex_round_begin_);
       round_++;
-      round_end_counter_ = 0;
+      std::for_each(thread_states_.begin(), thread_states_.end(),
+                    [](ThreadState& state) {
+                      if (state == RoundEnd) { state = RoundBegin; }});
       std::cout << lock_with(mutex_log_)
                 << "[m] round " << round_ << " begins" << std::endl;
       round_begin_.notify_all();
     }
 
     {
-      std::unique_lock<std::mutex> lock(mutex_round_end_counter_);
-      round_end_.wait(lock, [this] { return (round_end_counter_ == process_num_); });
+      std::unique_lock<std::mutex> lock(mutex_round_end_);
+      round_end_.wait(lock, [this] {
+        return (std::none_of(thread_states_.cbegin(), thread_states_.cend(),
+                             [](const ThreadState& state) { return (state == RoundBegin); })); });
       std::cout << lock_with(mutex_log_)
                 << "[m] round " << round_ << " ends" << std::endl;
     }

@@ -5,6 +5,25 @@
 #include <iomanip>
 #include <mutex>
 
+#ifndef NDEBUG
+#define debug_clog std::clog
+#else
+class NullBuffer : public std::streambuf {
+public:
+  int overflow(int c) { return c; }
+};
+
+class NullStream : public std::ostream {
+  public:
+    NullStream() : std::ostream(&m_sb) {}
+  private:
+    NullBuffer m_sb;
+};
+static NullStream null_stream;
+
+#define debug_clog null_stream
+#endif
+
 inline std::ostream& operator<<(std::ostream& out,
                                 const std::lock_guard<std::mutex> &) {
   return out;

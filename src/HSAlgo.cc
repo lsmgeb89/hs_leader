@@ -15,10 +15,10 @@ void HSAlgo::Process(const std::size_t& id,
                      utils::MessageChannel& recv_from_pred_ch,
                      utils::MessageChannel& send_to_succ_ch,
                      utils::MessageChannel& recv_from_succ_ch) {
-  std::size_t round_to_exit(2);
-  std::size_t succ_to_exit(2);
-  std::ptrdiff_t round(0);
-  bool pred_exit(false);
+  std::size_t round_to_exit(2); // how many rounds before I exit
+  std::size_t succ_to_exit(2);  // how many rounds before my successor exits
+  std::ptrdiff_t round(0);      // round counter
+  bool pred_exit(false);        // a flag indicating whether predecessor exits or not
 
   // states
   const std::size_t uid(id);
@@ -28,7 +28,7 @@ void HSAlgo::Process(const std::size_t& id,
   std::size_t phrase(0);
 
   while (round_to_exit) {
-    // round begin
+    // wait master to notify that this round begins
     {
       std::unique_lock<std::mutex> lock(mutex_round_begin_);
       round_begin_.wait(lock, [state] { return (*state == RoundBegin); });
@@ -36,9 +36,11 @@ void HSAlgo::Process(const std::size_t& id,
                  << "[process " << id << "] round " << round << " begins" << std::endl;
     }
 
-    // message-generation
+    // message-generation function
     std::unique_ptr<utils::Message> p_msg_to_succ(nullptr);
     std::unique_ptr<utils::Message> p_msg_to_pred(nullptr);
+
+    // send a message to predecessor if it has not exited
     if (!pred_exit) {
       p_msg_to_pred.reset(new utils::Message(msg_to_pred));
       debug_clog << lock_with(mutex_log_)
@@ -47,6 +49,7 @@ void HSAlgo::Process(const std::size_t& id,
       send_to_pred_ch.Send(std::move(p_msg_to_pred));
     }
 
+    // send a message to successor if it has not exited
     if (succ_to_exit) {
       p_msg_to_succ.reset(new utils::Message(msg_to_succ));
       debug_clog << lock_with(mutex_log_)
@@ -61,6 +64,7 @@ void HSAlgo::Process(const std::size_t& id,
     std::unique_ptr<utils::Message> p_msg_from_succ(nullptr);
     std::unique_ptr<utils::Message> p_msg_from_pred(nullptr);
 
+    // receive a message from predecessor if it has not exited
     if (!pred_exit) {
       recv_from_pred_ch.Receive(p_msg_from_pred);
       debug_clog << lock_with(mutex_log_)
@@ -68,6 +72,7 @@ void HSAlgo::Process(const std::size_t& id,
                  << " receives from predecessor: " << p_msg_from_pred->ToString() << std::endl;
     }
 
+    // receive a message from successor if it has not exited
     if (succ_to_exit) {
       recv_from_succ_ch.Receive(p_msg_from_succ);
       debug_clog << lock_with(mutex_log_)
@@ -75,7 +80,7 @@ void HSAlgo::Process(const std::size_t& id,
                  << " receives from successor: " << p_msg_from_succ->ToString() << std::endl;
     }
 
-    // dealing with exits
+    // count down for me
     if (round_to_exit == 1) {
       round_to_exit--;
       debug_clog << lock_with(mutex_log_)
@@ -83,6 +88,7 @@ void HSAlgo::Process(const std::size_t& id,
                  << " exits" << std::endl;
     }
 
+    // count down for successor
     if (succ_to_exit == 1) {
       succ_to_exit--;
     }
@@ -91,12 +97,23 @@ void HSAlgo::Process(const std::size_t& id,
     if (p_msg_from_pred &&
         p_msg_from_pred->type_ == utils::NotifyLeader &&
         p_msg_from_pred->flag_ == utils::Out) {
+      /*** exit protocol ***
+      /* If I receive leader notification message,
+      /* I assume that my predcessor will exit in this round
+      /*           and my successor will exit in next two round.
+      /* I will exit in next round because I have to relay leader notification to successor.
+       */
+      // So I set the flag. From next round, I will not send or receive any message to or from predcessor.
       pred_exit = true;
+      // If leader receives leader notification message, it means all other processes has been exits.
+      // Leader exits in this round
       if (status == Leader) {
         succ_to_exit = 0;
         round_to_exit = 0;
       } else {
+        // relay predecessor's leader notification to successor
         msg_to_succ = *p_msg_from_pred;
+        // I will exit in next round
         round_to_exit--;
         std::cout << lock_with(mutex_log_)
                   << "[process " << id << "] round " << round
@@ -138,7 +155,9 @@ void HSAlgo::Process(const std::size_t& id,
         std::cout << lock_with(mutex_log_)
                   << "[process " << id << "] round " << round
                   << " I'm the leader." << std::endl;
+        // send leader notification to successor in next round
         msg_to_succ = {utils::NotifyLeader, uid, utils::Out, 0};
+        // successor exiting begins counting down
         succ_to_exit--;
       } else if (p_msg_from_pred->uid_ < uid) {
         debug_clog << lock_with(mutex_log_)
@@ -225,7 +244,7 @@ void HSAlgo::Process(const std::size_t& id,
                  << phrase << std::endl;
     }
 
-    // round end
+    // notify master process that I'm done with this round or I exit
     {
       std::unique_lock<std::mutex> lock(mutex_round_end_);
       if (!round_to_exit) {
@@ -253,10 +272,12 @@ void HSAlgo::Master(void) {
                                                             recv_channels_.at(i)); });
   }
 
-
+  // If there is any process wants to go to next round, we do this.
+  // Otherwise, we exits.
   while (std::any_of(thread_states_.cbegin(),
                      thread_states_.cend(),
                      [](const ThreadState& state) { return (state == RoundEnd);})) {
+    // signal all non exited processes that this round begins
     {
       std::unique_lock<std::mutex> lock(mutex_round_begin_);
       round_++;
@@ -268,6 +289,7 @@ void HSAlgo::Master(void) {
       round_begin_.notify_all();
     }
 
+    // wait all processes end or exit this round
     {
       std::unique_lock<std::mutex> lock(mutex_round_end_);
       round_end_.wait(lock, [this] {
@@ -278,7 +300,7 @@ void HSAlgo::Master(void) {
     }
   }
 
-  // wait them exit
+  // wait all threads exit
   for (auto& thread : process_threads_) {
     thread.join();
   }

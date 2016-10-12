@@ -13,9 +13,9 @@ enum Flag {
 };
 
 enum MessageType {
-  NullType = 0,
-  SelectLeader = 1,
-  NotifyLeader = 2
+  NullType = 0,     // null message
+  SelectLeader = 1, // messages during the procedure of leader election
+  NotifyLeader = 2  // messages after leader election
 };
 
 struct Message {

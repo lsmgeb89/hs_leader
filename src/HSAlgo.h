@@ -10,9 +10,9 @@
 namespace HS {
 
 enum ThreadState {
-  RoundBegin = 0,
-  RoundEnd = 1,
-  Exited = 2
+  RoundBegin = 0, // Master notifies all processes that this round begins
+  RoundEnd = 1,   // A process has done all the things in this round and wants to go to next round
+  Exited = 2      // A process has done all the things in this round and exits in this round
 };
 
 enum Status {

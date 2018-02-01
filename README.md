@@ -1,8 +1,8 @@
 # HS Leader
 
 ## Summary
-  * Utilized multithreading and concurrent primitives ([threads][th], [mutexes][mu] & [conditon variables][cv] in C++11 [Thread Support Library][tsl]) to develop a simple simulator which simulates a synchronous distributed system composed of one master thread and `n` slave threads.
-  * Implemented coordinated behaviors between the master thread and `n` slave threads and [message passing][mp] in undirected links between two slave threads by using [monitors][mo] consisting of [mutexes][mu] and [conditon variables][cv]
+  * Utilized multi-threading and concurrent primitives ([threads][th], [mutexes][mu] & [condition variables][cv] in C++11 [Thread Support Library][tsl]) to develop a simple simulator which simulates a synchronous distributed system composed of one master thread and `n` slave threads.
+  * Implemented coordinated behaviors between the master thread and `n` slave threads and [message passing][mp] in undirected links between two slave threads by using [monitors][mo] consisting of [mutexes][mu] and [condition variables][cv]
   * Implemented [HS algorithm][hs] for [leader election][le] in synchronous [ring networks][rn] under the framework of this simulator.
 
 ## Project Information
